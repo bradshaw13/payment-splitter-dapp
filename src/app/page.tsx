@@ -261,15 +261,15 @@ export default function Page() {
   };
 
   const getExplorerUrl = (hash: string) => {
-    if (chainId === 84531) {
+    if (chainId === 84532) {
       // Base Goerli (testnet)
-      return `https://goerli.basescan.org/tx/${hash}`;
+      return `https://sepolia.basescan.org/tx/${hash}`;
     } else if (chainId === 8453) {
       // Base Mainnet
       return `https://basescan.org/tx/${hash}`;
     } else {
-      // Default to Base Goerli if chain is unknown
-      return `https://goerli.basescan.org/tx/${hash}`;
+      // Default to Base sepolia if chain is unknown
+      return `https://sepolia.basescan.org/tx/${hash}`;
     }
   };
 
