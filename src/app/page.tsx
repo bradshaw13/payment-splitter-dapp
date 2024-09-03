@@ -5,18 +5,21 @@ import Footer from "src/components/Footer";
 import WalletWrapper from "src/components/WalletWrapper";
 import { isAddress } from "viem";
 import { Switch } from "@headlessui/react";
-import { PlusIcon, XCircleIcon } from '@heroicons/react/24/solid';
-import { friendPaymentsABI } from "src/constants";
+import { PlusIcon, XCircleIcon } from "@heroicons/react/24/solid";
+import {
+  friendPaymentsABI,
+  friend_payments_contract_address,
+} from "src/constants";
 import NavigationBar from "src/components/NavigationBar";
 import { formatEther } from "viem";
 
-const contractAddress = "0x..."; // Replace with your contract address
+const contractAddress = friend_payments_contract_address;
 
 export default function Page() {
   const { address } = useAccount();
   const [friendAddress, setFriendAddress] = useState("");
   const [paymentDetails, setPaymentDetails] = useState({
-    debtors: [''] as string[],
+    debtors: [""] as string[],
     paymentName: "",
     amountPerDebtor: "",
     expirationDateTime: "",
@@ -37,13 +40,13 @@ export default function Page() {
     debtorToPay: "",
   });
 
-  // Contract interactions
-  const { data: isFriend, refetch: refetchIsFriend } = useReadContract({
-    address: contractAddress,
-    abi: friendPaymentsABI,
-    functionName: "isFriendsWithMe",
-    args: [friendAddress],
-  });
+  // // Contract interactions
+  // const { data: isFriend, refetch: refetchIsFriend } = useReadContract({
+  //   address: contractAddress,
+  //   abi: friendPaymentsABI,
+  //   functionName: "isFriendsWithMe",
+  //   args: [friendAddress],
+  // });
 
   const { writeContract } = useWriteContract();
 
@@ -72,9 +75,12 @@ export default function Page() {
 
   const validateFriendAddress = (address: string) => {
     if (!isAddress(address)) {
-      setErrors(prev => ({ ...prev, friendAddress: "Invalid Ethereum address" }));
+      setErrors((prev) => ({
+        ...prev,
+        friendAddress: "Invalid Ethereum address",
+      }));
     } else {
-      setErrors(prev => ({ ...prev, friendAddress: "" }));
+      setErrors((prev) => ({ ...prev, friendAddress: "" }));
     }
   };
 
@@ -91,7 +97,10 @@ export default function Page() {
     }
 
     // Validate amount per debtor
-    if (!paymentDetails.amountPerDebtor || BigInt(paymentDetails.amountPerDebtor) <= BigInt(0)) {
+    if (
+      !paymentDetails.amountPerDebtor ||
+      BigInt(paymentDetails.amountPerDebtor) <= BigInt(0)
+    ) {
       newErrors.amountPerDebtor = "Amount must be greater than 0 wei";
       isValid = false;
     } else {
@@ -102,14 +111,17 @@ export default function Page() {
     const expirationDate = new Date(paymentDetails.expirationDateTime);
     const tenMinutesFromNow = new Date(Date.now() + 10 * 60 * 1000);
     if (expirationDate <= tenMinutesFromNow) {
-      newErrors.expirationDateTime = "Expiration must be at least 10 minutes in the future";
+      newErrors.expirationDateTime =
+        "Expiration must be at least 10 minutes in the future";
       isValid = false;
     } else {
       newErrors.expirationDateTime = "";
     }
 
     // Validate debtors
-    const validDebtors = paymentDetails.debtors.filter(debtor => isAddress(debtor));
+    const validDebtors = paymentDetails.debtors.filter((debtor) =>
+      isAddress(debtor)
+    );
     if (validDebtors.length === 0) {
       newErrors.debtors = "At least one valid debtor address is required";
       isValid = false;
@@ -160,13 +172,18 @@ export default function Page() {
     if (isAddress(friendAddress)) {
       sendFriendRequest(friendAddress);
     } else {
-      setErrors(prev => ({ ...prev, friendAddress: "Invalid Ethereum address" }));
+      setErrors((prev) => ({
+        ...prev,
+        friendAddress: "Invalid Ethereum address",
+      }));
     }
   };
 
   const handleRequestPayment = () => {
     if (validatePaymentDetails()) {
-      const expirationTimestamp = Math.floor(new Date(paymentDetails.expirationDateTime).getTime() / 1000);
+      const expirationTimestamp = Math.floor(
+        new Date(paymentDetails.expirationDateTime).getTime() / 1000
+      );
       requestPayment(
         paymentDetails.debtors,
         paymentDetails.paymentName,
@@ -194,30 +211,30 @@ export default function Page() {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); // Adjust for local timezone
     const defaultDateTime = now.toISOString().slice(0, 16); // Format as "YYYY-MM-DDTHH:mm"
-    setPaymentDetails(prev => ({
+    setPaymentDetails((prev) => ({
       ...prev,
       expirationDateTime: defaultDateTime,
     }));
   }, []);
 
   const addDebtorField = () => {
-    setPaymentDetails(prev => ({
+    setPaymentDetails((prev) => ({
       ...prev,
-      debtors: [...prev.debtors, '']
+      debtors: [...prev.debtors, ""],
     }));
   };
 
   const removeDebtorField = (index: number) => {
-    setPaymentDetails(prev => ({
+    setPaymentDetails((prev) => ({
       ...prev,
-      debtors: prev.debtors.filter((_, i) => i !== index)
+      debtors: prev.debtors.filter((_, i) => i !== index),
     }));
   };
 
   const updateDebtorAddress = (index: number, value: string) => {
-    setPaymentDetails(prev => ({
+    setPaymentDetails((prev) => ({
       ...prev,
-      debtors: prev.debtors.map((addr, i) => i === index ? value : addr)
+      debtors: prev.debtors.map((addr, i) => (i === index ? value : addr)),
     }));
   };
 
@@ -243,18 +260,20 @@ export default function Page() {
                 placeholder="Friend's address"
                 className="w-full p-2 border rounded"
               />
-              {errors.friendAddress && <p className="text-red-500 text-sm">{errors.friendAddress}</p>}
+              {errors.friendAddress && (
+                <p className="text-red-500 text-sm">{errors.friendAddress}</p>
+              )}
               <button
                 onClick={handleSendFriendRequest}
                 className="mt-2 bg-blue-500 text-white p-2 rounded"
               >
                 Send Friend Request
               </button>
-              {isFriend !== undefined && (
+              {/* {isFriend !== undefined && (
                 <p className="mt-2">
                   {isFriend ? "You are friends" : "You are not friends"}
                 </p>
-              )}
+              )} */}
             </div>
 
             <div className="mb-4">
@@ -271,9 +290,14 @@ export default function Page() {
                 placeholder="Payment name"
                 className="w-full p-2 border rounded mb-2"
               />
-              {errors.paymentName && <p className="text-red-500 text-sm">{errors.paymentName}</p>}
+              {errors.paymentName && (
+                <p className="text-red-500 text-sm">{errors.paymentName}</p>
+              )}
               <div className="mb-2">
-                <label htmlFor="amountPerDebtor" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="amountPerDebtor"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Amount per debtor (in wei)
                 </label>
                 <input
@@ -291,7 +315,11 @@ export default function Page() {
                   min="0"
                   step="1"
                 />
-                {errors.amountPerDebtor && <p className="text-red-500 text-sm">{errors.amountPerDebtor}</p>}
+                {errors.amountPerDebtor && (
+                  <p className="text-red-500 text-sm">
+                    {errors.amountPerDebtor}
+                  </p>
+                )}
                 {paymentDetails.amountPerDebtor && (
                   <p className="text-sm text-gray-500 mt-1">
                     ≈ {formatEther(BigInt(paymentDetails.amountPerDebtor))} ETH
@@ -299,7 +327,10 @@ export default function Page() {
                 )}
               </div>
               <div className="flex flex-col mb-2">
-                <label htmlFor="expirationDateTime" className="mb-1 text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="expirationDateTime"
+                  className="mb-1 text-sm font-medium text-gray-700"
+                >
                   Expiration Date and Time
                 </label>
                 <input
@@ -315,14 +346,20 @@ export default function Page() {
                   className="w-full p-2 border rounded"
                 />
               </div>
-              {errors.expirationDateTime && <p className="text-red-500 text-sm">{errors.expirationDateTime}</p>}
+              {errors.expirationDateTime && (
+                <p className="text-red-500 text-sm">
+                  {errors.expirationDateTime}
+                </p>
+              )}
               <div className="space-y-2">
                 {paymentDetails.debtors.map((debtor, index) => (
                   <div key={index} className="flex items-center">
                     <input
                       type="text"
                       value={debtor}
-                      onChange={(e) => updateDebtorAddress(index, e.target.value)}
+                      onChange={(e) =>
+                        updateDebtorAddress(index, e.target.value)
+                      }
                       placeholder="Debtor address"
                       className="flex-grow p-2 border rounded"
                     />
@@ -337,7 +374,9 @@ export default function Page() {
                   </div>
                 ))}
               </div>
-              {errors.debtors && <p className="text-red-500 text-sm">{errors.debtors}</p>}
+              {errors.debtors && (
+                <p className="text-red-500 text-sm">{errors.debtors}</p>
+              )}
               <button
                 onClick={addDebtorField}
                 className="mt-2 flex items-center text-green-500 hover:text-green-600"
@@ -379,10 +418,15 @@ export default function Page() {
                 placeholder="Payment ID (bytes32)"
                 className="w-full p-2 border rounded mb-2"
               />
-              {errors.paymentId && <p className="text-red-500 text-sm">{errors.paymentId}</p>}
+              {errors.paymentId && (
+                <p className="text-red-500 text-sm">{errors.paymentId}</p>
+              )}
 
               <div className="mb-2">
-                <label htmlFor="amountToPay" className="block text-sm font-medium text-gray-700">
+                <label
+                  htmlFor="amountToPay"
+                  className="block text-sm font-medium text-gray-700"
+                >
                   Amount to pay (in wei)
                 </label>
                 <input
@@ -395,7 +439,9 @@ export default function Page() {
                   min="0"
                   step="1"
                 />
-                {errors.amountToPay && <p className="text-red-500 text-sm">{errors.amountToPay}</p>}
+                {errors.amountToPay && (
+                  <p className="text-red-500 text-sm">{errors.amountToPay}</p>
+                )}
                 {amountToPay && (
                   <p className="text-sm text-gray-500 mt-1">
                     ≈ {formatEther(BigInt(amountToPay))} ETH
@@ -411,7 +457,9 @@ export default function Page() {
                   className="w-full p-2 border rounded mb-2"
                 />
               )}
-              {payingForSomeoneElse && errors.debtorToPay && <p className="text-red-500 text-sm">{errors.debtorToPay}</p>}
+              {payingForSomeoneElse && errors.debtorToPay && (
+                <p className="text-red-500 text-sm">{errors.debtorToPay}</p>
+              )}
               <button
                 onClick={handleFulfillPayment}
                 className="bg-purple-500 text-white p-2 rounded"
