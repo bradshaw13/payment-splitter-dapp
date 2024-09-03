@@ -1,7 +1,7 @@
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 export const friend_payments_contract_address =
-  "0xb638164d99a3ddde9ef15c99a296c3990cb51469";
+  "0x000c2025ae52ef534f6cf08dcbd3ff15135524c8";
 
 export const friendPaymentsABI = [
   {
@@ -328,7 +328,13 @@ export const friendPaymentsABI = [
         internalType: "uint256",
       },
     ],
-    outputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "bytes32",
+        internalType: "bytes32",
+      },
+    ],
     stateMutability: "nonpayable",
   },
   {

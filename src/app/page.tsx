@@ -1,9 +1,9 @@
 "use client";
-import { useAccount, useReadContract, useWriteContract } from "wagmi";
+import { useAccount, useWriteContract, useConfig } from "wagmi";
 import { useState, useEffect } from "react";
 import Footer from "src/components/Footer";
 import WalletWrapper from "src/components/WalletWrapper";
-import { isAddress } from "viem";
+import { isAddress, Address, getAddress } from "viem";
 import { Switch } from "@headlessui/react";
 import { PlusIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import {
@@ -12,12 +12,19 @@ import {
 } from "src/constants";
 import NavigationBar from "src/components/NavigationBar";
 import { formatEther } from "viem";
+import { waitForTransactionReceipt } from "@wagmi/core";
+import { keccak256, toBytes } from "viem";
+import {} from "wagmi";
 
-const contractAddress = friend_payments_contract_address;
+const PAYMENT_REQUESTED_EVENT_SIGNATURE = keccak256(
+  toBytes("PaymentRequested(bytes32,address,string,address[])")
+);
 
+const contractAddress = friend_payments_contract_address.toLowerCase();
 export default function Page() {
-  const { address } = useAccount();
+  const { address, chainId } = useAccount();
   const [friendAddress, setFriendAddress] = useState("");
+  const [txHash, setTxHash] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState({
     debtors: [""] as string[],
     paymentName: "",
@@ -28,6 +35,7 @@ export default function Page() {
   const [debtorToPay, setDebtorToPay] = useState("");
   const [amountToPay, setAmountToPay] = useState("");
   const [payingForSomeoneElse, setPayingForSomeoneElse] = useState(false);
+  const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
 
   const [errors, setErrors] = useState({
     friendAddress: "",
@@ -40,36 +48,22 @@ export default function Page() {
     debtorToPay: "",
   });
 
-  // // Contract interactions
-  // const { data: isFriend, refetch: refetchIsFriend } = useReadContract({
-  //   address: contractAddress,
-  //   abi: friendPaymentsABI,
-  //   functionName: "isFriendsWithMe",
-  //   args: [friendAddress],
-  // });
-
-  const { writeContract } = useWriteContract();
+  const { writeContract, writeContractAsync } = useWriteContract({
+    mutation: {
+      onSuccess: (data) => {
+        // data here is the transaction receipt, not the return value
+        console.log("Transaction successful:", data);
+        // We'll need to wait for the transaction to be mined and then get the logs
+      },
+    },
+  });
 
   const sendFriendRequest = (friendAddress: string) => {
     writeContract({
-      address: contractAddress,
+      address: getAddress(contractAddress),
       abi: friendPaymentsABI,
       functionName: "sendFriendRequest",
-      args: [friendAddress],
-    });
-  };
-
-  const requestPayment = (
-    debtors: string[],
-    paymentName: string,
-    amountPerDebtor: bigint,
-    expirationTime: bigint
-  ) => {
-    writeContract({
-      address: contractAddress,
-      abi: friendPaymentsABI,
-      functionName: "requestPayment",
-      args: [debtors, paymentName, amountPerDebtor, expirationTime],
+      args: [getAddress(friendAddress)],
     });
   };
 
@@ -179,17 +173,45 @@ export default function Page() {
     }
   };
 
-  const handleRequestPayment = () => {
+  const config = useConfig();
+
+  const handleRequestPayment = async () => {
     if (validatePaymentDetails()) {
       const expirationTimestamp = Math.floor(
         new Date(paymentDetails.expirationDateTime).getTime() / 1000
       );
-      requestPayment(
-        paymentDetails.debtors,
-        paymentDetails.paymentName,
-        BigInt(paymentDetails.amountPerDebtor),
-        BigInt(expirationTimestamp)
-      );
+      try {
+        const hash = await writeContractAsync({
+          address: getAddress(contractAddress),
+          abi: friendPaymentsABI,
+          functionName: "requestPayment",
+          args: [
+            paymentDetails.debtors,
+            paymentDetails.paymentName,
+            BigInt(paymentDetails.amountPerDebtor),
+            BigInt(expirationTimestamp),
+          ],
+        });
+        setTxHash(hash);
+
+        // Wait for the transaction to be mined
+        const receipt = await waitForTransactionReceipt(config, { hash });
+
+        // Find the event log that contains the payment ID
+        const event = receipt.logs.find(
+          (log) => log.topics[0] === PAYMENT_REQUESTED_EVENT_SIGNATURE
+        );
+
+        if (event && event.topics[1]) {
+          const paymentId = event.topics[1];
+          setLastPaymentId(paymentId);
+          console.log("Payment ID:", paymentId);
+        } else {
+          console.error("PaymentRequested event not found in logs");
+        }
+      } catch (error) {
+        console.error("Error requesting payment:", error);
+      }
     }
   };
 
@@ -197,7 +219,7 @@ export default function Page() {
     if (validateFulfillPayment()) {
       const debtorAddress = payingForSomeoneElse ? debtorToPay : address;
       writeContract({
-        address: contractAddress,
+        address: getAddress(contractAddress),
         abi: friendPaymentsABI,
         functionName: "fulfillPayment",
         args: [paymentId, debtorAddress],
@@ -236,6 +258,19 @@ export default function Page() {
       ...prev,
       debtors: prev.debtors.map((addr, i) => (i === index ? value : addr)),
     }));
+  };
+
+  const getExplorerUrl = (hash: string) => {
+    if (chainId === 84531) {
+      // Base Goerli (testnet)
+      return `https://goerli.basescan.org/tx/${hash}`;
+    } else if (chainId === 8453) {
+      // Base Mainnet
+      return `https://basescan.org/tx/${hash}`;
+    } else {
+      // Default to Base Goerli if chain is unknown
+      return `https://goerli.basescan.org/tx/${hash}`;
+    }
   };
 
   return (
@@ -390,6 +425,36 @@ export default function Page() {
               >
                 Request Payment
               </button>
+              {(txHash || lastPaymentId) && (
+                <div className="mt-4 p-4 bg-blue-100 rounded-md">
+                  <h4 className="font-semibold text-blue-800">
+                    Payment Request Submitted
+                  </h4>
+                  {txHash && (
+                    <p className="text-sm text-blue-600">
+                      Transaction Hash:{" "}
+                      <a
+                        href={getExplorerUrl(txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono underline"
+                      >
+                        {txHash}
+                      </a>
+                    </p>
+                  )}
+                  {lastPaymentId && (
+                    <p className="text-sm text-blue-600">
+                      Payment ID:{" "}
+                      <span className="font-mono">{lastPaymentId}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-blue-500 mt-1">
+                    Save this information for future reference or to share with
+                    debtors.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mb-4">
