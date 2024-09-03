@@ -231,8 +231,11 @@ export default function Page() {
   // Use useEffect to set the default expiration date/time when the component mounts
   useEffect(() => {
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); // Adjust for local timezone
-    const defaultDateTime = now.toISOString().slice(0, 16); // Format as "YYYY-MM-DDTHH:mm"
+    const oneDayLater = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Add 24 hours
+    oneDayLater.setMinutes(
+      oneDayLater.getMinutes() - oneDayLater.getTimezoneOffset()
+    ); // Adjust for local timezone
+    const defaultDateTime = oneDayLater.toISOString().slice(0, 16); // Format as "YYYY-MM-DDTHH:mm"
     setPaymentDetails((prev) => ({
       ...prev,
       expirationDateTime: defaultDateTime,
