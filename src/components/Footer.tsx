@@ -1,25 +1,28 @@
 "use client";
 
+import { friend_payments_contract_address } from "src/constants";
 import {
-  DISCORD_LINK,
-  FIGMA_LINK,
-  GITHUB_LINK,
+  SMART_CONTRACT_GITHUB_LINK,
+  DAPP_GITHUB_LINK,
   RICK_ROLL,
-  TWITTER_LINK,
 } from "src/links";
 import ArrowSvg from "src/svg/ArrowSvg";
 
 const docLinks = [
-  { href: RICK_ROLL, title: "Docs" },
-  { href: GITHUB_LINK, title: "Github" },
-  { href: RICK_ROLL, title: "Discord" },
-  { href: RICK_ROLL, title: "Figma" },
+  {
+    href:
+      "https://sepolia.basescan.org/address/" +
+      friend_payments_contract_address,
+    title: "Contract Address",
+  },
+  { href: SMART_CONTRACT_GITHUB_LINK, title: "Contracts Github" },
+  { href: DAPP_GITHUB_LINK, title: "Dapp Github" },
   { href: RICK_ROLL, title: "X" },
 ];
 
 export default function Footer() {
   return (
-    <section className="mt-auto mb-2 flex w-full flex-col flex-col-reverse justify-between gap-2 md:mt-8 md:mb-6 md:flex-row">
+    <section className="mt-auto mb-16 pb-8 flex w-full flex-col flex-col-reverse justify-between gap-2 md:mt-8 md:mb-24 md:pb-12 md:flex-row">
       <aside className="flex items-center pt-2 md:pt-0">
         <h3 className="mr-2 mb-2 text-m md:mb-0">Cool right?</h3>
       </aside>

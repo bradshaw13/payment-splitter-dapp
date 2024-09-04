@@ -1,11 +1,11 @@
-'use client';
+"use client";
 import {
   Address,
   Avatar,
   EthBalance,
   Identity,
   Name,
-} from '@coinbase/onchainkit/identity';
+} from "@coinbase/onchainkit/identity";
 import {
   ConnectWallet,
   Wallet,
@@ -14,7 +14,7 @@ import {
   WalletDropdownDisconnect,
   WalletDropdownFundLink,
   WalletDropdownLink,
-} from '@coinbase/onchainkit/wallet';
+} from "@coinbase/onchainkit/wallet";
 
 type WalletWrapperParams = {
   text?: string;
@@ -44,7 +44,6 @@ export default function WalletWrapper({
             <Address />
             <EthBalance />
           </Identity>
-          <WalletDropdownBasename />
           <WalletDropdownLink icon="wallet" href="https://wallet.coinbase.com">
             Go to Wallet Dashboard
           </WalletDropdownLink>
