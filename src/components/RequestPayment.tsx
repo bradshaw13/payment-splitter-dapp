@@ -20,7 +20,6 @@ const PAYMENT_REQUESTED_EVENT_SIGNATURE = keccak256(
 
 export default function RequestPayment() {
   const { address, chainId } = useAccount();
-  const [friendAddress, setFriendAddress] = useState("");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [paymentDetails, setPaymentDetails] = useState({
     debtors: [""] as string[],
@@ -28,10 +27,7 @@ export default function RequestPayment() {
     amountPerDebtor: "",
     expirationDateTime: "",
   });
-  const [paymentId, setPaymentId] = useState("");
-  const [debtorToPay, setDebtorToPay] = useState("");
-  const [amountToPay, setAmountToPay] = useState("");
-  const [payingForSomeoneElse, setPayingForSomeoneElse] = useState(false);
+
   const [lastPaymentId, setLastPaymentId] = useState<string | null>(null);
 
   const [errors, setErrors] = useState({
@@ -45,35 +41,7 @@ export default function RequestPayment() {
     debtorToPay: "",
   });
 
-  const { writeContract, writeContractAsync } = useWriteContract({
-    mutation: {
-      onSuccess: (data) => {
-        // data here is the transaction receipt, not the return value
-        console.log("Transaction successful:", data);
-        // We'll need to wait for the transaction to be mined and then get the logs
-      },
-    },
-  });
-
-  const sendFriendRequest = (friendAddress: string) => {
-    writeContract({
-      address: getAddress(friend_payments_contract_address),
-      abi: friendPaymentsABI,
-      functionName: "sendFriendRequest",
-      args: [getAddress(friendAddress)],
-    });
-  };
-
-  const validateFriendAddress = (address: string) => {
-    if (!isAddress(address)) {
-      setErrors((prev) => ({
-        ...prev,
-        friendAddress: "Invalid Ethereum address",
-      }));
-    } else {
-      setErrors((prev) => ({ ...prev, friendAddress: "" }));
-    }
-  };
+  const { writeContract, writeContractAsync } = useWriteContract();
 
   const validatePaymentDetails = () => {
     let newErrors = { ...errors };
@@ -127,49 +95,6 @@ export default function RequestPayment() {
     return isValid;
   };
 
-  const validateFulfillPayment = () => {
-    let newErrors = { ...errors };
-    let isValid = true;
-
-    // Validate payment ID
-    if (!paymentId.trim()) {
-      newErrors.paymentId = "Payment ID is required";
-      isValid = false;
-    } else {
-      newErrors.paymentId = "";
-    }
-
-    // Validate amount to pay
-    if (!amountToPay || BigInt(amountToPay) <= BigInt(0)) {
-      newErrors.amountToPay = "Amount must be greater than 0 wei";
-      isValid = false;
-    } else {
-      newErrors.amountToPay = "";
-    }
-
-    // Validate debtor to pay if paying for someone else
-    if (payingForSomeoneElse && !isAddress(debtorToPay)) {
-      newErrors.debtorToPay = "Invalid Ethereum address";
-      isValid = false;
-    } else {
-      newErrors.debtorToPay = "";
-    }
-
-    setErrors(newErrors);
-    return isValid;
-  };
-
-  const handleSendFriendRequest = () => {
-    if (isAddress(friendAddress)) {
-      sendFriendRequest(friendAddress);
-    } else {
-      setErrors((prev) => ({
-        ...prev,
-        friendAddress: "Invalid Ethereum address",
-      }));
-    }
-  };
-
   const config = useConfig();
 
   const handleRequestPayment = async () => {
@@ -212,20 +137,6 @@ export default function RequestPayment() {
     }
   };
 
-  const handleFulfillPayment = () => {
-    if (validateFulfillPayment()) {
-      const debtorAddress = payingForSomeoneElse ? debtorToPay : address;
-      writeContract({
-        address: getAddress(friend_payments_contract_address),
-        abi: friendPaymentsABI,
-        functionName: "fulfillPayment",
-        args: [paymentId, debtorAddress],
-        value: BigInt(amountToPay),
-      });
-    }
-  };
-
-  // Use useEffect to set the default expiration date/time when the component mounts
   useEffect(() => {
     const now = new Date();
     const oneDayLater = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Add 24 hours
@@ -275,37 +186,9 @@ export default function RequestPayment() {
 
   return (
     <div className="flex h-full w-96 max-w-full flex-col px-1 md:w-[1008px]">
-      <section className="templateSection flex w-full flex-col items-center justify-center gap-4 rounded-xl bg-gray-100 px-2 py-4 md:grow">
+      <section className="templateSection flex w-full flex-col items-center justify-center gap-4 rounded-xl px-2 py-4 md:grow">
         {address ? (
           <div className="w-full max-w-md">
-            <div className="mb-4">
-              <h3 className="text-xl font-semibold mb-2">Friend Management</h3>
-              <input
-                type="text"
-                value={friendAddress}
-                onChange={(e) => {
-                  setFriendAddress(e.target.value);
-                  validateFriendAddress(e.target.value);
-                }}
-                placeholder="Friend's address"
-                className="w-full p-2 border rounded"
-              />
-              {errors.friendAddress && (
-                <p className="text-red-500 text-sm">{errors.friendAddress}</p>
-              )}
-              <button
-                onClick={handleSendFriendRequest}
-                className="mt-2 bg-blue-500 text-white p-2 rounded"
-              >
-                Send Friend Request
-              </button>
-              {/* {isFriend !== undefined && (
-              <p className="mt-2">
-                {isFriend ? "You are friends" : "You are not friends"}
-              </p>
-            )} */}
-            </div>
-
             <div className="mb-4">
               <h3 className="text-xl font-semibold mb-2">Request Payment</h3>
               <input
@@ -450,82 +333,6 @@ export default function RequestPayment() {
                   </p>
                 </div>
               )}
-            </div>
-
-            <div className="mb-4">
-              <h3 className="text-xl font-semibold mb-2">Fulfill Payment</h3>
-              <div className="flex items-center mb-2">
-                <span className="mr-2">Paying for someone else?</span>
-                <Switch
-                  checked={payingForSomeoneElse}
-                  onChange={setPayingForSomeoneElse}
-                  className={`${
-                    payingForSomeoneElse ? "bg-blue-600" : "bg-gray-200"
-                  } relative inline-flex h-6 w-11 items-center rounded-full`}
-                >
-                  <span className="sr-only">Pay for someone else</span>
-                  <span
-                    className={`${
-                      payingForSomeoneElse ? "translate-x-6" : "translate-x-1"
-                    } inline-block h-4 w-4 transform rounded-full bg-white transition`}
-                  />
-                </Switch>
-              </div>
-              <input
-                type="text"
-                value={paymentId}
-                onChange={(e) => setPaymentId(e.target.value)}
-                placeholder="Payment ID (bytes32)"
-                className="w-full p-2 border rounded mb-2"
-              />
-              {errors.paymentId && (
-                <p className="text-red-500 text-sm">{errors.paymentId}</p>
-              )}
-
-              <div className="mb-2">
-                <label
-                  htmlFor="amountToPay"
-                  className="block text-sm font-medium text-gray-700"
-                >
-                  Amount to pay (in wei)
-                </label>
-                <input
-                  id="amountToPay"
-                  type="number"
-                  value={amountToPay}
-                  onChange={(e) => setAmountToPay(e.target.value)}
-                  placeholder="Amount to pay (wei)"
-                  className="w-full p-2 border rounded"
-                  min="0"
-                  step="1"
-                />
-                {errors.amountToPay && (
-                  <p className="text-red-500 text-sm">{errors.amountToPay}</p>
-                )}
-                {amountToPay && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    ≈ {formatEther(BigInt(amountToPay))} ETH
-                  </p>
-                )}
-              </div>
-              {payingForSomeoneElse && (
-                <input
-                  type="text"
-                  value={debtorToPay}
-                  onChange={(e) => setDebtorToPay(e.target.value)}
-                  placeholder="Debtor address to pay for"
-                  className="w-full p-2 border rounded mb-2"
-                />
-              )}
-              {payingForSomeoneElse && errors.debtorToPay && (
-                <p className="text-red-500 text-sm">{errors.debtorToPay}</p>
-              )}
-              <button
-                onClick={handleFulfillPayment}
-                className="bg-purple-500 text-white p-2 rounded"
-              >
-                Fulfill Payment
-              </button>
             </div>
           </div>
         ) : (

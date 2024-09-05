@@ -20,7 +20,7 @@ interface Recipient {
   amount: string;
 }
 
-export default function SendPayment() {
+export default function SendArbitraryPayment() {
   const {
     data: hash,
     writeContract,
@@ -112,7 +112,6 @@ export default function SendPayment() {
   };
 
   return (
-    // could cover this all with a address ?
     <div className="w-full max-w-md">
       <h3 className="text-xl font-semibold mb-4">Send Payment</h3>
 
