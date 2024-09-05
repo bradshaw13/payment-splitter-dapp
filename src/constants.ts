@@ -1,7 +1,7 @@
 export const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 export const friend_payments_contract_address =
-  "0xac508e8b7f6d51c1f413f7d45cb2a7bd08c04d34";
+  "0x1f4c0976c1610799e3133de9ee1f4ed2335c81a0";
 
 export const friendPaymentsABI = [
   {
@@ -404,10 +404,10 @@ export const friendPaymentsABI = [
     name: "ArbitraryPaymentSent",
     inputs: [
       {
-        name: "paymentName",
-        type: "string",
+        name: "sender",
+        type: "address",
         indexed: true,
-        internalType: "string",
+        internalType: "address",
       },
       {
         name: "debtor",
@@ -420,6 +420,12 @@ export const friendPaymentsABI = [
         type: "uint256",
         indexed: true,
         internalType: "uint256",
+      },
+      {
+        name: "paymentName",
+        type: "string",
+        indexed: false,
+        internalType: "string",
       },
     ],
     anonymous: false,
@@ -555,16 +561,16 @@ export const friendPaymentsABI = [
         internalType: "address",
       },
       {
+        name: "debtors",
+        type: "address",
+        indexed: true,
+        internalType: "address",
+      },
+      {
         name: "paymentName",
         type: "string",
         indexed: false,
         internalType: "string",
-      },
-      {
-        name: "debtors",
-        type: "address[]",
-        indexed: false,
-        internalType: "address[]",
       },
     ],
     anonymous: false,
