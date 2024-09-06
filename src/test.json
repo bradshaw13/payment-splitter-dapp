@@ -1,0 +1,13 @@
+{
+    "data": {
+        "arbitraryPaymentSents": [
+            {
+                "id": "0x7668b899ad4d2581f5a769d62d376f0ecf34a1aea95ff46430c20f532b972a4804000000",
+                "sender": "0x1e27dace4a6fc84caad9be5e336f36c1195dafb8",
+                "debtor": "0x2d76eb0dbe6c2b8623cf5f1ac4200068a8d7977b",
+                "amount": "1"
+            }
+        ],
+        "friendRemoveds": []
+    }
+}
