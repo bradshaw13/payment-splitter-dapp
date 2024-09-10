@@ -25,10 +25,10 @@ export function useWamigConfig() {
           groupName: "Recommended Wallet",
           wallets: [coinbaseWallet],
         },
-        {
-          groupName: "Other Wallets",
-          wallets: [rainbowWallet, metaMaskWallet],
-        },
+        // {
+        //   groupName: "Other Wallets",
+        //   wallets: [rainbowWallet, metaMaskWallet],
+        // },
       ],
       {
         appName: "payment-splitter",

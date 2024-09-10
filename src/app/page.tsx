@@ -20,9 +20,12 @@ export default function Page() {
     <div className="flex flex-col min-h-screen w-full">
       <NavigationBar />
       <main className="flex-grow flex flex-col items-center px-4 py-8">
-        <h2 className="text-2xl font-bold mb-6 text-center">
+        <h2 className="text-2xl font-bold mb-2 text-center">
           Friend Payments Dashboard
         </h2>
+        <p className="text-sm text-gray-600 mb-6 text-center">
+          (Work in Progress - Currently available only on Base Sepolia)
+        </p>
         {address ? (
           <div className="w-full max-w-md">
             <div className="flex border-b mb-6">
