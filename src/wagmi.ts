@@ -25,6 +25,7 @@ export function useWamigConfig() {
           groupName: "Recommended Wallet",
           wallets: [coinbaseWallet],
         },
+        // Metamask does not support get capabilities
         // {
         //   groupName: "Other Wallets",
         //   wallets: [rainbowWallet, metaMaskWallet],
