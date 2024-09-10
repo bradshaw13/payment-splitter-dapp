@@ -1,8 +1,9 @@
 "use client";
-import { useAccount, useWriteContract, useConfig } from "wagmi";
-import { useState, useEffect } from "react";
+import { useAccount, useConfig, useWriteContract } from "wagmi";
+import { useCapabilities, useWriteContracts } from "wagmi/experimental";
+import { useState, useEffect, useMemo } from "react";
 import WalletWrapper from "src/components/WalletWrapper";
-import { isAddress, Address, getAddress } from "viem";
+import { isAddress, Address, getAddress, createPublicClient } from "viem";
 import { Switch } from "@headlessui/react";
 import { PlusIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import {
@@ -12,8 +13,9 @@ import {
 import { formatEther } from "viem";
 import { waitForTransactionReceipt } from "@wagmi/core";
 import { keccak256, toBytes } from "viem";
-import {} from "wagmi";
-
+import { NEXT_PUBLIC_CDP_PAYMASTER } from "../config";
+import { isWalletACoinbaseSmartWallet } from "@coinbase/onchainkit/wallet";
+import { useOnchainKit } from "@coinbase/onchainkit";
 const PAYMENT_REQUESTED_EVENT_SIGNATURE = keccak256(
   toBytes("PaymentRequested(bytes32,address,string,address[])")
 );
@@ -21,6 +23,13 @@ const PAYMENT_REQUESTED_EVENT_SIGNATURE = keccak256(
 export default function RequestPayment() {
   const { address, chainId } = useAccount();
   const [txHash, setTxHash] = useState<string | null>(null);
+  const [userOpId, setUserOpId] = useState<string | undefined>(undefined);
+  const [isSmartWallet, setIsSmartWallet] = useState(true);
+
+  const handleSmartWalletFlip = () => {
+    setIsSmartWallet((prevState) => !prevState);
+  };
+
   const [paymentDetails, setPaymentDetails] = useState({
     debtors: [""] as string[],
     paymentName: "",
@@ -42,6 +51,27 @@ export default function RequestPayment() {
   });
 
   const { writeContract, writeContractAsync } = useWriteContract();
+  const { writeContractsAsync } = useWriteContracts();
+
+  const { data: availableCapabilities } = useCapabilities({
+    account: address,
+  });
+
+  const capabilities = useMemo(() => {
+    if (!availableCapabilities || !chainId) return {};
+    const capabilitiesForChain = availableCapabilities[chainId];
+    if (
+      capabilitiesForChain["paymasterService"] &&
+      capabilitiesForChain["paymasterService"].supported
+    ) {
+      return {
+        paymasterService: {
+          url: NEXT_PUBLIC_CDP_PAYMASTER,
+        },
+      };
+    }
+    return {};
+  }, [availableCapabilities, chainId]);
 
   const validatePaymentDetails = () => {
     let newErrors = { ...errors };
@@ -103,21 +133,81 @@ export default function RequestPayment() {
         new Date(paymentDetails.expirationDateTime).getTime() / 1000
       );
       try {
-        const hash = await writeContractAsync({
-          address: getAddress(friend_payments_contract_address),
-          abi: friendPaymentsABI,
-          functionName: "requestPayment",
-          args: [
-            paymentDetails.debtors.map((debtor) => getAddress(debtor)),
-            paymentDetails.paymentName,
-            BigInt(paymentDetails.amountPerDebtor),
-            BigInt(expirationTimestamp),
+        if (isSmartWallet) {
+          const id = await writeContractsAsync({
+            contracts: [
+              {
+                address: getAddress(friend_payments_contract_address),
+                abi: friendPaymentsABI,
+                functionName: "requestPayment",
+                args: [
+                  paymentDetails.debtors.map((debtor) => getAddress(debtor)),
+                  paymentDetails.paymentName,
+                  BigInt(paymentDetails.amountPerDebtor),
+                  BigInt(expirationTimestamp),
+                ],
+              },
+            ],
+            capabilities,
+          });
+          console.log("id", id);
+          setUserOpId(userOpId);
+
+          console.log("The sender address is a valid smart wallet proxy.");
+        } else {
+          const hash = await writeContractAsync({
+            address: getAddress(friend_payments_contract_address),
+            abi: friendPaymentsABI,
+            functionName: "requestPayment",
+            args: [
+              paymentDetails.debtors.map((debtor) => getAddress(debtor)),
+              paymentDetails.paymentName,
+              BigInt(paymentDetails.amountPerDebtor),
+              BigInt(expirationTimestamp),
+            ],
+          });
+          setTxHash(hash);
+
+          // Wait for the transaction to be mined
+          const receipt = await waitForTransactionReceipt(config, { hash });
+
+          // Find the event log that contains the payment ID
+          const event = receipt.logs.find(
+            (log) => log.topics[0] === PAYMENT_REQUESTED_EVENT_SIGNATURE
+          );
+
+          if (event && event.topics[1]) {
+            const paymentId = event.topics[1];
+            setLastPaymentId(paymentId);
+            console.log("Payment ID:", paymentId);
+          } else {
+            console.error("PaymentRequested event not found in logs");
+          }
+        }
+
+        const hash = await writeContractsAsync({
+          contracts: [
+            {
+              address: getAddress(friend_payments_contract_address),
+              abi: friendPaymentsABI,
+              functionName: "requestPayment",
+              args: [
+                paymentDetails.debtors.map((debtor) => getAddress(debtor)),
+                paymentDetails.paymentName,
+                BigInt(paymentDetails.amountPerDebtor),
+                BigInt(expirationTimestamp),
+              ],
+            },
           ],
+          capabilities,
         });
+        console.log("id", hash);
         setTxHash(hash);
 
         // Wait for the transaction to be mined
-        const receipt = await waitForTransactionReceipt(config, { hash });
+        const receipt = await waitForTransactionReceipt(config, {
+          hash: hash as `0x${string}`,
+        });
 
         // Find the event log that contains the payment ID
         const event = receipt.logs.find(
@@ -190,6 +280,16 @@ export default function RequestPayment() {
         {address ? (
           <div className="w-full max-w-md">
             <div className="mb-4">
+              <button
+                onClick={handleSmartWalletFlip}
+                className={`px-4 py-2 rounded ${
+                  isSmartWallet
+                    ? "bg-green-500 text-white"
+                    : "bg-red-500 text-white"
+                }`}
+              >
+                Smart Wallet: {isSmartWallet ? "Yes" : "No"}
+              </button>
               <h3 className="text-xl font-semibold mb-2">Request Payment</h3>
               <input
                 type="text"

@@ -70,7 +70,8 @@ export default function FulfillPayment() {
         address: getAddress(friend_payments_contract_address),
         abi: friendPaymentsABI,
         functionName: "fulfillPayment",
-        args: [paymentId, debtorAddress],
+        args: [paymentId as `0x${string}`, debtorAddress as `0x${string}`],
+        // these two lines changed in case something is wrong here, focusing on other stuff
         value: BigInt(amountToPay),
       });
     }
