@@ -108,7 +108,7 @@ export default function RequestPayment() {
           abi: friendPaymentsABI,
           functionName: "requestPayment",
           args: [
-            paymentDetails.debtors,
+            paymentDetails.debtors.map((debtor) => getAddress(debtor)),
             paymentDetails.paymentName,
             BigInt(paymentDetails.amountPerDebtor),
             BigInt(expirationTimestamp),

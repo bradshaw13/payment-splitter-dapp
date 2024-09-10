@@ -705,4 +705,4 @@ export const friendPaymentsABI = [
     name: "ReentrancyGuardReentrantCall",
     inputs: [],
   },
-];
+] as const;
