@@ -13,6 +13,8 @@ export default function Page() {
   const { address } = useAccount();
   const [activeTab, setActiveTab] = useState("request");
 
+  // TODO: need to initialize and useSwitchChain() to switch to base sepolia
+
   return (
     <div className="flex flex-col min-h-screen w-full">
       <NavigationBar />
