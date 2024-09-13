@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   useWriteContract,
   useWaitForTransactionReceipt,
@@ -12,8 +12,16 @@ import {
   friendPaymentsABI,
   friend_payments_contract_address,
 } from "src/constants";
-import { formatEther } from "viem";
+import { formatEther, createPublicClient, http } from "viem";
 import { getExplorerUrl } from "src/utils"; // Import the new function
+import { useCapabilities, useWriteContracts } from "wagmi/experimental";
+import { baseSepolia } from "viem/chains";
+import { isWalletACoinbaseSmartWallet } from "@coinbase/onchainkit/wallet";
+import { UserOperation } from "permissionless";
+import {
+  NEXT_PUBLIC_CDP_PAYMASTER,
+  NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL,
+} from "src/config";
 
 interface Recipient {
   address: string;
@@ -21,17 +29,44 @@ interface Recipient {
 }
 
 export default function SendArbitraryPayment() {
+  const { chainId, address } = useAccount();
+
   const {
     data: hash,
-    writeContract,
+    writeContractAsync,
     isPending: isConfirming,
   } = useWriteContract();
+
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL),
+  }) as any;
+
+  const { writeContractsAsync, data: userOpId } = useWriteContracts();
+
+  const { data: availableCapabilities } = useCapabilities({
+    account: address,
+  });
+
+  const capabilities = useMemo(() => {
+    if (!availableCapabilities || !chainId) return {};
+    const capabilitiesForChain = availableCapabilities[chainId];
+    if (
+      capabilitiesForChain["paymasterService"] &&
+      capabilitiesForChain["paymasterService"].supported
+    ) {
+      return {
+        paymasterService: {
+          url: NEXT_PUBLIC_CDP_PAYMASTER,
+        },
+      };
+    }
+    return {};
+  }, [availableCapabilities, chainId]);
 
   const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash,
   });
-
-  const { chainId } = useAccount();
 
   const [paymentName, setPaymentName] = useState("");
   const [recipients, setRecipients] = useState<Recipient[]>([
@@ -98,13 +133,35 @@ export default function SendArbitraryPayment() {
     const amounts = recipients.map((r) => BigInt(r.amount));
 
     try {
-      writeContract({
-        address: getAddress(friend_payments_contract_address),
-        abi: friendPaymentsABI,
-        functionName: "sendArbitraryPayment",
-        args: [paymentName, recipientAddresses, amounts],
-        value: totalWei,
+      const userOperation = { sender: address } as UserOperation<"v0.6">;
+      const isSmartWalletFunc = await isWalletACoinbaseSmartWallet({
+        client: publicClient,
+        userOp: userOperation,
       });
+      if (isSmartWalletFunc.isCoinbaseSmartWallet) {
+        const contracts = [
+          {
+            address: getAddress(friend_payments_contract_address),
+            abi: friendPaymentsABI,
+            functionName: "sendArbitraryPayment",
+            args: [paymentName, recipientAddresses, amounts],
+            value: totalWei,
+          },
+        ];
+        await writeContractsAsync({
+          contracts,
+          capabilities,
+        });
+        console.log("The sender address is a valid smart wallet proxy.");
+      } else {
+        await writeContractAsync({
+          address: getAddress(friend_payments_contract_address),
+          abi: friendPaymentsABI,
+          functionName: "sendArbitraryPayment",
+          args: [paymentName, recipientAddresses, amounts],
+          value: totalWei,
+        });
+      }
     } catch (error) {
       console.error("Error sending payment:", error);
       setErrors(["Failed to send payment. Please try again."]);
@@ -193,8 +250,22 @@ export default function SendArbitraryPayment() {
             href={getExplorerUrl(hash, chainId || 84532)}
             target="_blank"
             rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-700"
           >
             {hash}
+          </a>
+        </div>
+      )}
+      {userOpId && (
+        <div className="mb-2">
+          UserOp ID:{" "}
+          <a
+            href={`https://jiffyscan.xyz/userOpHash/${userOpId.slice(0, 66)}?network=base-sepolia`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-500 hover:text-blue-700"
+          >
+            {userOpId.slice(0, 66)}
           </a>
         </div>
       )}

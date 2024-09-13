@@ -7,10 +7,7 @@ import NavigationBar from "src/components/NavigationBar";
 import RequestPayment from "src/components/RequestPayment";
 import SendArbitraryPayment from "src/components/SendArbitraryPayment";
 import FulfillPayment from "src/components/FulfillPayment";
-import { friend_payments_contract_address } from "src/constants";
 import FriendManagement from "src/components/FriendManagement";
-
-const contractAddress = friend_payments_contract_address.toLowerCase();
 
 export default function Page() {
   const { address } = useAccount();

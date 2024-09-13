@@ -3,8 +3,7 @@ import { useAccount, useConfig, useWriteContract } from "wagmi";
 import { useCapabilities, useWriteContracts } from "wagmi/experimental";
 import { useState, useEffect, useMemo } from "react";
 import WalletWrapper from "src/components/WalletWrapper";
-import { isAddress, Address, getAddress, createPublicClient } from "viem";
-import { Switch } from "@headlessui/react";
+import { isAddress, getAddress, createPublicClient } from "viem";
 import { PlusIcon, XCircleIcon } from "@heroicons/react/24/solid";
 import {
   friendPaymentsABI,
@@ -12,23 +11,25 @@ import {
 } from "src/constants";
 import { formatEther } from "viem";
 import { waitForTransactionReceipt } from "@wagmi/core";
-import { keccak256, toBytes } from "viem";
-import { NEXT_PUBLIC_CDP_PAYMASTER } from "../config";
+import { keccak256, toBytes, http } from "viem";
+import { baseSepolia } from "viem/chains";
+import {
+  NEXT_PUBLIC_CDP_PAYMASTER,
+  NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL,
+} from "src/config";
 import { isWalletACoinbaseSmartWallet } from "@coinbase/onchainkit/wallet";
-import { useOnchainKit } from "@coinbase/onchainkit";
+import { UserOperation } from "permissionless";
 const PAYMENT_REQUESTED_EVENT_SIGNATURE = keccak256(
   toBytes("PaymentRequested(bytes32,address,string,address[])")
 );
 
 export default function RequestPayment() {
   const { address, chainId } = useAccount();
-  const [txHash, setTxHash] = useState<string | null>(null);
-  const [userOpId, setUserOpId] = useState<string | undefined>(undefined);
-  const [isSmartWallet, setIsSmartWallet] = useState(true);
 
-  const handleSmartWalletFlip = () => {
-    setIsSmartWallet((prevState) => !prevState);
-  };
+  const publicClient = createPublicClient({
+    chain: baseSepolia,
+    transport: http(NEXT_PUBLIC_BASE_SEPOLIA_RPC_URL),
+  }) as any;
 
   const [paymentDetails, setPaymentDetails] = useState({
     debtors: [""] as string[],
@@ -50,8 +51,8 @@ export default function RequestPayment() {
     debtorToPay: "",
   });
 
-  const { writeContract, writeContractAsync } = useWriteContract();
-  const { writeContractsAsync } = useWriteContracts();
+  const { writeContractAsync, data: txHash } = useWriteContract();
+  const { writeContractsAsync, data: userOpId } = useWriteContracts();
 
   const { data: availableCapabilities } = useCapabilities({
     account: address,
@@ -133,8 +134,13 @@ export default function RequestPayment() {
         new Date(paymentDetails.expirationDateTime).getTime() / 1000
       );
       try {
-        if (isSmartWallet) {
-          const id = await writeContractsAsync({
+        const userOperation = { sender: address } as UserOperation<"v0.6">;
+        const isSmartWalletFunc = await isWalletACoinbaseSmartWallet({
+          client: publicClient,
+          userOp: userOperation,
+        });
+        if (isSmartWalletFunc.isCoinbaseSmartWallet) {
+          await writeContractsAsync({
             contracts: [
               {
                 address: getAddress(friend_payments_contract_address),
@@ -150,10 +156,6 @@ export default function RequestPayment() {
             ],
             capabilities,
           });
-          console.log("id", id);
-          setUserOpId(userOpId);
-
-          console.log("The sender address is a valid smart wallet proxy.");
         } else {
           const hash = await writeContractAsync({
             address: getAddress(friend_payments_contract_address),
@@ -166,7 +168,6 @@ export default function RequestPayment() {
               BigInt(expirationTimestamp),
             ],
           });
-          setTxHash(hash);
 
           // Wait for the transaction to be mined
           const receipt = await waitForTransactionReceipt(config, { hash });
@@ -183,43 +184,6 @@ export default function RequestPayment() {
           } else {
             console.error("PaymentRequested event not found in logs");
           }
-        }
-
-        const hash = await writeContractsAsync({
-          contracts: [
-            {
-              address: getAddress(friend_payments_contract_address),
-              abi: friendPaymentsABI,
-              functionName: "requestPayment",
-              args: [
-                paymentDetails.debtors.map((debtor) => getAddress(debtor)),
-                paymentDetails.paymentName,
-                BigInt(paymentDetails.amountPerDebtor),
-                BigInt(expirationTimestamp),
-              ],
-            },
-          ],
-          capabilities,
-        });
-        console.log("id", hash);
-        setTxHash(hash);
-
-        // Wait for the transaction to be mined
-        const receipt = await waitForTransactionReceipt(config, {
-          hash: hash as `0x${string}`,
-        });
-
-        // Find the event log that contains the payment ID
-        const event = receipt.logs.find(
-          (log) => log.topics[0] === PAYMENT_REQUESTED_EVENT_SIGNATURE
-        );
-
-        if (event && event.topics[1]) {
-          const paymentId = event.topics[1];
-          setLastPaymentId(paymentId);
-          console.log("Payment ID:", paymentId);
-        } else {
-          console.error("PaymentRequested event not found in logs");
         }
       } catch (error) {
         console.error("Error requesting payment:", error);
@@ -263,7 +227,7 @@ export default function RequestPayment() {
 
   const getExplorerUrl = (hash: string) => {
     if (chainId === 84532) {
-      // Base Goerli (testnet)
+      // Base Sepolia (testnet)
       return `https://sepolia.basescan.org/tx/${hash}`;
     } else if (chainId === 8453) {
       // Base Mainnet
@@ -280,16 +244,6 @@ export default function RequestPayment() {
         {address ? (
           <div className="w-full max-w-md">
             <div className="mb-4">
-              <button
-                onClick={handleSmartWalletFlip}
-                className={`px-4 py-2 rounded ${
-                  isSmartWallet
-                    ? "bg-green-500 text-white"
-                    : "bg-red-500 text-white"
-                }`}
-              >
-                Smart Wallet: {isSmartWallet ? "Yes" : "No"}
-              </button>
               <h3 className="text-xl font-semibold mb-2">Request Payment</h3>
               <p className="text-sm text-gray-600 mb-4">
                 Note: You must be friends with an address to request payment
@@ -407,13 +361,26 @@ export default function RequestPayment() {
               >
                 Request Payment
               </button>
-              {(txHash || lastPaymentId) && (
+              {(txHash || userOpId) && (
                 <div className="mt-4 p-4 bg-blue-100 rounded-md">
                   <h4 className="font-semibold text-blue-800">
                     Payment Request Submitted
                   </h4>
+                  {userOpId && (
+                    <p className="text-sm text-blue-600 break-words">
+                      UserOp ID:{" "}
+                      <a
+                        href={`https://jiffyscan.xyz/userOpHash/${userOpId.slice(0, 66)}?network=base-sepolia`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono underline"
+                      >
+                        {userOpId.slice(0, 66)}
+                      </a>
+                    </p>
+                  )}
                   {txHash && (
-                    <p className="text-sm text-blue-600">
+                    <p className="text-sm text-blue-600  break-words">
                       Transaction Hash:{" "}
                       <a
                         href={getExplorerUrl(txHash)}
